@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; form-action 'none';" />
+  <title>SCT Due Diligence File Sanitizer & OPSEC Firewall</title>
+  <!-- JSZip for 100% client-side Office (.xlsx, .docx, .pptx) inspection & scrubbing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- pdf-lib for 100% client-side PDF metadata inspection & scrubbing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-alt: #0b1324;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --lubrizol: #f59e0b;
+      --ccc: #3b82f6;
+      --pass: #10b981;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .shield {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    }
+    h1 {
+      font-size: 20px;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 2px 0 0 0;
+    }
+    .badge-local {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .mode-selector {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .mode-card {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+    .mode-card:hover {
+      border-color: #64748b;
+    }
+    .mode-card.active-lubrizol {
+      border-color: var(--lubrizol);
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(30, 41, 59, 0.95));
+      box-shadow: 0 0 0 1px var(--lubrizol);
+    }
+    .mode-card.active-ccc {
+      border-color: var(--ccc);
+      background: linear-gradient(180deg, rgba(59, 130, 246, 0.12), rgba(30, 41, 59, 0.95));
+      box-shadow: 0 0 0 1px var(--ccc);
+    }
+    .mode-title {
+      font-weight: 700;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .mode-desc {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0;
+    }
+    .settings-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .settings-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .settings-group input[type="text"] {
+      background: var(--card-alt);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      width: 210px;
+    }
+    .dropzone {
+      border: 2px dashed #475569;
+      background: rgba(30, 41, 59, 0.6);
+      border-radius: 14px;
+      padding: 38px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 24px;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+    }
+    .dropzone h2 {
+      margin: 8px 0 6px 0;
+      font-size: 18px;
+    }
+    .dropzone p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-success {
+      background: var(--pass);
+      color: #052e16;
+    }
+    .btn-success:hover { background: #059669; color: white; }
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+    .file-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+    }
+    .file-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+    .file-name {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .status-clean {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .status-scrubbed {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+    .status-blocked {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.5);
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 768px) {
+      .mode-selector, .grid-2 { grid-template-columns: 1fr; }
+    }
+    .meta-box {
+      background: var(--card-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 12.5px;
+    }
+    .meta-box h4 {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+      gap: 8px;
+    }
+    .meta-row:last-child { border-bottom: none; }
+    .meta-key { color: var(--muted); }
+    .meta-val { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; text-align: right; word-break: break-all; }
+    .val-bad { color: #f87171; }
+    .val-good { color: #34d399; }
+    .findings-list {
+      margin: 12px 0 0 0;
+      padding-left: 18px;
+      font-size: 13px;
+    }
+    .findings-list li { margin-bottom: 4px; }
+    .finding-crit { color: #fca5a5; font-weight: 600; }
+    .finding-fixed { color: #93c5fd; }
+    .finding-ok { color: #6ee7b7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="shield">SCT</div>
+        <div>
+          <h1>SCT Due Diligence File Sanitizer &amp; OPSEC Firewall</h1>
+          <p class="subtitle">Inspects, scrubs hidden metadata, and verifies files before sharing with Lubrizol (DFIN Venue) or Cotton Creek Capital</p>
+        </div>
+      </div>
+      <div class="badge-local">&#128274; 100% Local In-Browser Processing (No Data Uploaded)</div>
+    </header>
+
+    <!-- Mode Selector -->
+    <div class="mode-selector">
+      <div id="modeLubrizol" class="mode-card active-lubrizol" onclick="setMode('LUBRIZOL')">
+        <div class="mode-title">
+          <span>&#128737;&#65039; Mode 1: Outbound to Lubrizol / DFIN Venue (Project Bertha)</span>
+          <span style="font-size:12px;color:#fbbf24;">STRICT OPSEC</span>
+        </div>
+        <p class="mode-desc">
+          Blocks any mention of <strong>Cotton Creek Capital</strong>, <strong>Weems</strong>, <strong>DiGesualdo</strong>, <strong>O'Dwyer</strong>, <strong>Price Delk</strong>, <strong>Bucshon</strong>, <strong>Baley</strong>, or <strong>xvaqueros</strong>. Scrubs hidden Excel/Word/PPT/PDF author tags, threaded comment identities, external workbook links, and printer paths.
+        </p>
+      </div>
+
+      <div id="modeCCC" class="mode-card" onclick="setMode('CCC')">
+        <div class="mode-title">
+          <span>&#128193; Mode 2: Outbound to Cotton Creek Capital (SCT &amp; LBZ Diligence)</span>
+          <span style="font-size:12px;color:#60a5fa;">DILIGENCE READY</span>
+        </div>
+        <p class="mode-desc">
+          Prepares SCT &amp; Lubrizol diligence files for Cotton Creek Capital. Strips local machine printer paths, personal properties, and revision logs; checks for broken Excel formulas (<code>#REF!</code>) or external local drive links (<code>C:\Users\...</code>); stamps clean SCT metadata.
+        </p>
+      </div>
+    </div>
+
+    <!-- Settings Bar -->
+    <div class="settings-bar">
+      <div class="settings-group">
+        <label for="cleanAuthor"><strong>Clean Author Stamp:</strong></label>
+        <input type="text" id="cleanAuthor" value="Andrew Ruffner" />
+      </div>
+      <div class="settings-group">
+        <label for="cleanCompany"><strong>Clean Company Stamp:</strong></label>
+        <input type="text" id="cleanCompany" value="Southern Chemical & Textiles" />
+      </div>
+      <div class="settings-group">
+        <label><input type="checkbox" id="stripComments" checked /> Strip Hidden Comments &amp; Author Identities</label>
+      </div>
+      <div class="settings-group">
+        <label><input type="checkbox" id="stripExternalLinks" checked /> Strip External Workbook Links</label>
+      </div>
+    </div>
+
+    <!-- Dropzone -->
+    <div id="dropzone" class="dropzone" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" multiple accept=".xlsx,.xlsm,.docx,.pptx,.pdf" style="display:none" onchange="handleFiles(this.files)" />
+      <div style="font-size:34px;">&#128196; &#10145;&#65039; &#128737;&#65039;</div>
+      <h2>Drag &amp; Drop Excel (.xlsx), Word (.docx), PowerPoint (.pptx), or PDF (.pdf) Files Here</h2>
+      <p>Or click to browse files from your computer. Every file is inspected and scrubbed immediately in your browser.</p>
+    </div>
+
+        <!-- 1-Click Live Demo Bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px 16px;margin-bottom:20px;">
+      <div style="font-size:13px;color:#cbd5e1;">
+        <strong>&#9889; 1-Click Instant Test Files:</strong> Try scrubbing real sample files right now without downloading anything first:
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn" style="background:#0284c7;color:white;padding:8px 14px;font-size:12.5px;" onclick="loadDemoFile(1)">
+          &#129514; Test 1: Lubrizol RFI Tracker (Scrubs Hidden Author &amp; Printer)
+        </button>
+        <button type="button" class="btn" style="background:#dc2626;color:white;padding:8px 14px;font-size:12.5px;" onclick="loadDemoFile(2)">
+          &#128680; Test 2: Contaminated Cotton Creek File (Triggers OPSEC Block)
+        </button>
+      </div>
+    </div>
+
+    <div id="resultsContainer"></div>
+  </div>
+
+  <script>
+    let currentMode = 'LUBRIZOL';
+
+    async function loadDemoFile(id) {
+      const zip = new JSZip();
+      zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+</Types>`);
+      zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`);
+      zip.file("xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets><sheet name="RFI_Tracker" sheetId="1" r:id="rId1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/></sheets></workbook>`);
+      zip.file("xl/printerSettings/printerSettings1.bin", "SYNTHETIC_LOCAL_PRINTER_DEVMODE_PATH_\\SCT-FS01\Accounting_HP_LaserJet");
+
+      if (id === 1) {
+        zip.file("docProps/core.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:creator>External Deal Advisor (Sample)</dc:creator>
+  <cp:lastModifiedBy>Internal Reviewer (Sample)</cp:lastModifiedBy>
+  <dcterms:created xsi:type="dcterms:W3CDTF">2026-10-18T14:22:10Z</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">2026-10-30T09:15:44Z</dcterms:modified>
+</cp:coreProperties>`);
+        zip.file("docProps/app.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>Sample Advisory Corp</Company><Manager>Sample Deal Lead</Manager></Properties>`);
+        zip.file("xl/worksheets/sheet1.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Sample Due Diligence RFI Tracker — Ready for Scrubbing</t></is></c></row></sheetData></worksheet>`);
+        const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const file = new File([blob], "1_Sample_RFI_Tracker_Test.xlsx", { type: blob.type, lastModified: Date.now() });
+        handleFiles([file]);
+      } else {
+        zip.file("docProps/core.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <dc:creator>Andrew Ruffner</dc:creator>
+  <cp:lastModifiedBy>Jason Marti</cp:lastModifiedBy>
+</cp:coreProperties>`);
+        zip.file("docProps/app.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>Cotton Creek Capital</Company></Properties>`);
+        zip.file("xl/worksheets/sheet1.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>CONFIDENTIAL: Cotton Creek Capital LBO Valuation &amp; Lubrizol Project Bertha Comparison</t></is></c></row></sheetData></worksheet>`);
+        const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const file = new File([blob], "2_Contaminated_Cross_Deal_Test.xlsx", { type: blob.type, lastModified: Date.now() });
+        handleFiles([file]);
+      }
+    }
+
+
+    // Forbidden terms that MUST NEVER appear in any file going to Lubrizol / DFIN Venue
+    const LUBRIZOL_FORBIDDEN_PATTERNS = [
+      { label: 'Cotton Creek Capital', regex: /cotton\s*creek/gi },
+      { label: 'cottoncreekcapital.com', regex: /cottoncreekcapital/gi },
+      { label: 'Chris Weems (cweems)', regex: /\b(weems|cweems)\b/gi },
+      { label: 'Antonio DiGesualdo', regex: /\b(digesualdo|adigesualdo)\b/gi },
+      { label: "Jonathan O'Dwyer", regex: /\b(o'?dwyer|jodwyer)\b/gi },
+      { label: 'Alec Bucshon', regex: /\b(bucshon|abucshon)\b/gi },
+      { label: 'Dillon Baley', regex: /\b(baley|dbaley)\b/gi },
+      { label: 'Price Delk (CCC Template Creator)', regex: /\b(price\s+delk|delk)\b/gi },
+      { label: 'Xavier Vaqueros (xvaqueros)', regex: /\b(vaqueros|xvaqueros)\b/gi },
+      { label: 'CCC Internal Tracker Name (LBZ_Diligence / vDist)', regex: /\b(LBZ_Diligence|SCT_Diligence|vDist)\b/gi }
+    ];
+
+    const CCC_WARN_PATTERNS = [
+      { label: 'Internal Draft Marker (DO NOT SHARE / INTERNAL ONLY)', regex: /\b(DO\s+NOT\s+SHARE|INTERNAL\s+ONLY)\b/gi },
+      { label: 'Local Windows/Mac File Path Link', regex: /([A-Z]:\\Users\\|\/Users\/[a-zA-Z0-9_-]+\/)/g },
+      { label: 'Broken Excel Formula (#REF!)', regex: /#REF!/g }
+    ];
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('modeLubrizol').className = 'mode-card' + (mode === 'LUBRIZOL' ? ' active-lubrizol' : '');
+      document.getElementById('modeCCC').className = 'mode-card' + (mode === 'CCC' ? ' active-ccc' : '');
+    }
+
+    const dz = document.getElementById('dropzone');
+    dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('dragover'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+    dz.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dz.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+    });
+
+    async function handleFiles(fileList) {
+      for (const file of fileList) {
+        await processFile(file);
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeXml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    async function processFile(file) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const cleanAuthor = document.getElementById('cleanAuthor').value.trim();
+      const cleanCompany = document.getElementById('cleanCompany').value.trim();
+      const stripComments = document.getElementById('stripComments').checked;
+      const stripExtLinks = document.getElementById('stripExternalLinks').checked;
+
+      if (['xlsx', 'xlsm', 'docx', 'pptx'].includes(ext)) {
+        await processOfficeFile(file, ext, cleanAuthor, cleanCompany, stripComments, stripExtLinks);
+      } else if (ext === 'pdf') {
+        await processPdfFile(file, cleanAuthor, cleanCompany);
+      } else {
+        alert('Unsupported file type: ' + file.name + '. Please drop .xlsx, .docx, .pptx, or .pdf files.');
+      }
+    }
+
+    async function processOfficeFile(file, ext, cleanAuthor, cleanCompany, stripComments, stripExtLinks) {
+      const arrayBuffer = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(arrayBuffer);
+
+      const beforeMeta = {
+        creator: '(none)',
+        lastModifiedBy: '(none)',
+        company: '(none)',
+        created: '(none)',
+        modified: '(none)',
+        persons: [],
+        printerSettings: 0,
+        externalLinks: [],
+        commentsCount: 0
+      };
+
+      const findings = [];
+      const criticalLeaks = [];
+
+      // Check filename itself in Lubrizol mode
+      if (currentMode === 'LUBRIZOL') {
+        for (const pat of LUBRIZOL_FORBIDDEN_PATTERNS) {
+          pat.regex.lastIndex = 0;
+          if (pat.regex.test(file.name)) {
+            criticalLeaks.push(`Filename "${file.name}" matches forbidden pattern: ${pat.label}`);
+          }
+        }
+      }
+
+      // 1. Inspect & Scrub docProps/core.xml
+      const nowIso = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+      if (zip.file('docProps/core.xml')) {
+        const coreXml = await zip.file('docProps/core.xml').async('string');
+        const creatorMatch = coreXml.match(/<dc:creator[^>]*>([\s\S]*?)<\/dc:creator>/i);
+        const lastModMatch = coreXml.match(/<cp:lastModifiedBy[^>]*>([\s\S]*?)<\/cp:lastModifiedBy>/i);
+        const createdMatch = coreXml.match(/<dcterms:created[^>]*>([\s\S]*?)<\/dcterms:created>/i);
+        const modifiedMatch = coreXml.match(/<dcterms:modified[^>]*>([\s\S]*?)<\/dcterms:modified>/i);
+
+        if (creatorMatch) beforeMeta.creator = creatorMatch[1];
+        if (lastModMatch) beforeMeta.lastModifiedBy = lastModMatch[1];
+        if (createdMatch) beforeMeta.created = createdMatch[1];
+        if (modifiedMatch) beforeMeta.modified = modifiedMatch[1];
+
+        // Build clean core.xml
+        const newCoreXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:creator>${escapeXml(cleanAuthor)}</dc:creator>
+  <cp:lastModifiedBy>${escapeXml(cleanAuthor)}</cp:lastModifiedBy>
+  <dcterms:created xsi:type="dcterms:W3CDTF">${escapeXml(beforeMeta.created !== '(none)' ? beforeMeta.created : nowIso)}</dcterms:created>
+  <dcterms:modified xsi:type="dcterms:W3CDTF">${escapeXml(nowIso)}</dcterms:modified>
+</cp:coreProperties>`;
+        zip.file('docProps/core.xml', newCoreXml);
+        findings.push(`Scrubbed core.xml Author ("${beforeMeta.creator}" -> "${cleanAuthor}") & Last Modified By ("${beforeMeta.lastModifiedBy}" -> "${cleanAuthor}")`);
+      }
+
+      // 2. Inspect & Scrub docProps/app.xml
+      if (zip.file('docProps/app.xml')) {
+        let appXml = await zip.file('docProps/app.xml').async('string');
+        const compMatch = appXml.match(/<Company[^>]*>([\s\S]*?)<\/Company>/i);
+        if (compMatch) beforeMeta.company = compMatch[1];
+
+        if (/<Company[^>]*>[\s\S]*?<\/Company>/i.test(appXml)) {
+          appXml = appXml.replace(/<Company[^>]*>[\s\S]*?<\/Company>/gi, `<Company>${escapeXml(cleanCompany)}</Company>`);
+        } else if (/<Company\s*\/>/i.test(appXml)) {
+          appXml = appXml.replace(/<Company\s*\/>/gi, `<Company>${escapeXml(cleanCompany)}</Company>`);
+        }
+        appXml = appXml.replace(/<Manager[^>]*>[\s\S]*?<\/Manager>/gi, '<Manager/>');
+        zip.file('docProps/app.xml', appXml);
+        findings.push(`Standardized app.xml Company tag to "${cleanCompany}"`);
+      }
+
+      // 3. Remove docProps/custom.xml if present
+      if (zip.file('docProps/custom.xml')) {
+        zip.remove('docProps/custom.xml');
+        findings.push('Removed custom document properties (docProps/custom.xml)');
+      }
+
+      // 4. Inspect & Scrub Printer Settings, Persons, Comments, and External Links
+      const allPaths = Object.keys(zip.files);
+      for (const p of allPaths) {
+        // Printer settings binary files leak Windows printer & server names
+        if (p.includes('printerSettings/')) {
+          beforeMeta.printerSettings++;
+          zip.remove(p);
+        }
+        // Excel 365 person metadata (stores displayName & userId/email of threaded commenters)
+        if (p.startsWith('xl/persons/') && p.endsWith('.xml')) {
+          const personXml = await zip.file(p).async('string');
+          const names = [...personXml.matchAll(/displayName="([^"]+)"/gi)].map(m => m[1]);
+          beforeMeta.persons.push(...names);
+          if (stripComments) {
+            const cleanPersonXml = personXml.replace(/displayName="[^"]+"/gi, `displayName="${escapeXml(cleanAuthor)}"`)
+                                            .replace(/userId="[^"]+"/gi, 'userId="sct"');
+            zip.file(p, cleanPersonXml);
+          }
+        }
+        // Comments & Threaded Comments
+        if ((p.includes('comments') || p.includes('threadedComments')) && p.endsWith('.xml')) {
+          beforeMeta.commentsCount++;
+          if (stripComments) {
+            let commXml = await zip.file(p).async('string');
+            commXml = commXml.replace(/<author[^>]*>[\s\S]*?<\/author>/gi, `<author>${escapeXml(cleanAuthor)}</author>`);
+            zip.file(p, commXml);
+          }
+        }
+        // External Workbook Links
+        if (p.startsWith('xl/externalLinks/') && p.endsWith('.xml.rels')) {
+          const relXml = await zip.file(p).async('string');
+          const targets = [...relXml.matchAll(/Target="([^"]+)"/gi)].map(m => m[1]);
+          beforeMeta.externalLinks.push(...targets);
+          if (stripExtLinks) {
+            const cleanedRel = relXml.replace(/Target="[^"]+"/gi, 'Target=""');
+            zip.file(p, cleanedRel);
+          }
+        }
+      }
+
+      if (beforeMeta.printerSettings > 0) {
+        findings.push(`Removed ${beforeMeta.printerSettings} embedded local printer settings binary file(s)`);
+      }
+      if (beforeMeta.persons.length > 0) {
+        findings.push(`Sanitized ${beforeMeta.persons.length} Excel 365 threaded-comment person identity record(s): ${beforeMeta.persons.join(', ')}`);
+      }
+      if (beforeMeta.externalLinks.length > 0) {
+        findings.push(`Detected external workbook link(s): ${beforeMeta.externalLinks.join(', ')}`);
+      }
+
+      // 5. Deep Content Scan across all XML text parts (cells, sheets, document body)
+      const patternsToCheck = currentMode === 'LUBRIZOL' ? LUBRIZOL_FORBIDDEN_PATTERNS : CCC_WARN_PATTERNS;
+      for (const p of Object.keys(zip.files)) {
+        if (!p.endsWith('.xml') && !p.endsWith('.rels')) continue;
+        if (p.startsWith('docProps/')) continue; // Already scrubbed above
+        const content = await zip.file(p).async('string');
+        for (const pat of patternsToCheck) {
+          pat.regex.lastIndex = 0;
+          const matches = content.match(pat.regex);
+          if (matches && matches.length > 0) {
+            const uniqueMatches = [...new Set(matches)].slice(0, 4).join(', ');
+            criticalLeaks.push(`Found ${pat.label} (${uniqueMatches}) inside internal part "${p}"`);
+          }
+        }
+      }
+
+      const cleanBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const cleanMeta = {
+        creator: cleanAuthor,
+        lastModifiedBy: cleanAuthor,
+        company: cleanCompany,
+        printerSettings: '0 (Removed)',
+        persons: stripComments ? 'Sanitized' : beforeMeta.persons.join(', ') || 'None'
+      };
+
+      renderFileResult(file.name, beforeMeta, cleanMeta, findings, criticalLeaks, cleanBlob);
+    }
+
+    async function processPdfFile(file, cleanAuthor, cleanCompany) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { updateMetadata: false });
+
+      const beforeMeta = {
+        creator: pdfDoc.getAuthor() || '(none)',
+        lastModifiedBy: pdfDoc.getCreator() || '(none)',
+        company: pdfDoc.getProducer() || '(none)',
+        created: pdfDoc.getCreationDate() ? pdfDoc.getCreationDate().toISOString() : '(none)',
+        modified: pdfDoc.getModificationDate() ? pdfDoc.getModificationDate().toISOString() : '(none)',
+        persons: [],
+        printerSettings: 0,
+        externalLinks: [],
+        commentsCount: 0
+      };
+
+      const findings = [];
+      const criticalLeaks = [];
+
+      const rawMetaString = `${beforeMeta.creator} ${beforeMeta.lastModifiedBy} ${beforeMeta.company} ${pdfDoc.getTitle() || ''} ${pdfDoc.getSubject() || ''} ${(pdfDoc.getKeywords() || '')} ${file.name}`;
+      if (currentMode === 'LUBRIZOL') {
+        for (const pat of LUBRIZOL_FORBIDDEN_PATTERNS) {
+          pat.regex.lastIndex = 0;
+          if (pat.regex.test(rawMetaString)) {
+            criticalLeaks.push(`PDF metadata/filename matched "${pat.label}" (scrubbed from PDF header properties)`);
+          }
+        }
+      }
+
+      pdfDoc.setAuthor(cleanAuthor);
+      pdfDoc.setCreator(cleanCompany);
+      pdfDoc.setProducer('SCT Document Security');
+      pdfDoc.setTitle(file.name.replace(/\.pdf$/i, ''));
+      pdfDoc.setSubject('');
+      pdfDoc.setKeywords([]);
+      pdfDoc.setModificationDate(new Date());
+
+      findings.push(`Scrubbed PDF Author ("${beforeMeta.creator}" -> "${cleanAuthor}") and Creator/Producer tags`);
+
+      const pdfBytes = await pdfDoc.save();
+      const cleanBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const cleanMeta = {
+        creator: cleanAuthor,
+        lastModifiedBy: cleanCompany,
+        company: 'SCT Document Security',
+        printerSettings: 'N/A (PDF)',
+        persons: 'None'
+      };
+
+      renderFileResult(file.name, beforeMeta, cleanMeta, findings, criticalLeaks, cleanBlob);
+    }
+
+    function renderFileResult(fileName, beforeMeta, cleanMeta, findings, criticalLeaks, cleanBlob) {
+      const container = document.getElementById('resultsContainer');
+      const card = document.createElement('div');
+      card.className = 'file-card';
+
+      const isBlocked = criticalLeaks.length > 0;
+      const modeBadge = currentMode === 'LUBRIZOL' ? 'LUBRIZOL / DFIN VENUE' : 'COTTON CREEK CAPITAL';
+      const statusHtml = isBlocked
+        ? `<span class="status-pill status-blocked">&#9888;&#65039; CONTAMINATION WARNING (${criticalLeaks.length})</span>`
+        : `<span class="status-pill status-clean">&#9989; VERIFIED CLEAN FOR ${modeBadge}</span>`;
+
+      const downloadUrl = URL.createObjectURL(cleanBlob);
+      const safeDownloadName = fileName.replace(/^\*\*\s*/, '');
+
+      card.innerHTML = `
+        <div class="file-header">
+          <div class="file-name">
+            <span>&#128196; ${escapeHtml(fileName)}</span>
+            ${statusHtml}
+          </div>
+          <div>
+            <a class="btn ${isBlocked ? 'btn-danger' : 'btn-success'}" href="${downloadUrl}" download="${escapeHtml(safeDownloadName)}">
+              &#11015;&#65039; Download Scrubbed Copy (${escapeHtml(safeDownloadName)})
+            </a>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="meta-box">
+            <h4>Before Sanitization (Original Hidden Metadata)</h4>
+            <div class="meta-row"><span class="meta-key">Author (dc:creator):</span><span class="meta-val val-bad">${escapeHtml(beforeMeta.creator)}</span></div>
+            <div class="meta-row"><span class="meta-key">Last Modified By:</span><span class="meta-val val-bad">${escapeHtml(beforeMeta.lastModifiedBy)}</span></div>
+            <div class="meta-row"><span class="meta-key">Company Tag:</span><span class="meta-val">${escapeHtml(beforeMeta.company)}</span></div>
+            <div class="meta-row"><span class="meta-key">Embedded Printer Paths:</span><span class="meta-val">${beforeMeta.printerSettings} file(s)</span></div>
+            <div class="meta-row"><span class="meta-key">Comment Person IDs:</span><span class="meta-val">${escapeHtml(beforeMeta.persons.join(', ') || 'None')}</span></div>
+            <div class="meta-row"><span class="meta-key">External Workbook Links:</span><span class="meta-val">${escapeHtml(beforeMeta.externalLinks.join(', ') || 'None')}</span></div>
+          </div>
+
+          <div class="meta-box">
+            <h4>After Sanitization (Scrubbed Output)</h4>
+            <div class="meta-row"><span class="meta-key">Author (dc:creator):</span><span class="meta-val val-good">${escapeHtml(cleanMeta.creator)}</span></div>
+            <div class="meta-row"><span class="meta-key">Last Modified By:</span><span class="meta-val val-good">${escapeHtml(cleanMeta.lastModifiedBy)}</span></div>
+            <div class="meta-row"><span class="meta-key">Company Tag:</span><span class="meta-val val-good">${escapeHtml(cleanMeta.company)}</span></div>
+            <div class="meta-row"><span class="meta-key">Embedded Printer Paths:</span><span class="meta-val val-good">${escapeHtml(cleanMeta.printerSettings)}</span></div>
+            <div class="meta-row"><span class="meta-key">Comment Person IDs:</span><span class="meta-val val-good">${escapeHtml(cleanMeta.persons)}</span></div>
+            <div class="meta-row"><span class="meta-key">Target Mode Verified:</span><span class="meta-val val-good">${modeBadge}</span></div>
+          </div>
+        </div>
+
+        <ul class="findings-list">
+          ${criticalLeaks.map(c => `<li class="finding-crit">&#128680; ${escapeHtml(c)}</li>`).join('')}
+          ${findings.map(f => `<li class="finding-fixed">&#10004;&#65039; ${escapeHtml(f)}</li>`).join('')}
+          ${criticalLeaks.length === 0 ? `<li class="finding-ok">&#9989; Zero forbidden identity keywords or external leaks detected inside document body/cells.</li>` : ''}
+        </ul>
+      `;
+
+      container.prepend(card);
+    }
+  </script>
+</body>
+</html>
