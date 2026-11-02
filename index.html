@@ -355,79 +355,11 @@
       <p>Or click to browse files from your computer. Every file is inspected and scrubbed immediately in your browser.</p>
     </div>
 
-        <!-- 1-Click Live Demo Bar -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px 16px;margin-bottom:20px;">
-      <div style="font-size:13px;color:#cbd5e1;">
-        <strong>&#9889; 1-Click Instant Test Files:</strong> Try scrubbing real sample files right now without downloading anything first:
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button type="button" class="btn" style="background:#0284c7;color:white;padding:8px 14px;font-size:12.5px;" onclick="loadDemoFile(1)">
-          &#129514; Test 1: Lubrizol RFI Tracker (Scrubs Hidden Author &amp; Printer)
-        </button>
-        <button type="button" class="btn" style="background:#dc2626;color:white;padding:8px 14px;font-size:12.5px;" onclick="loadDemoFile(2)">
-          &#128680; Test 2: Contaminated Cotton Creek File (Triggers OPSEC Block)
-        </button>
-      </div>
-    </div>
-
     <div id="resultsContainer"></div>
   </div>
 
   <script>
     let currentMode = 'LUBRIZOL';
-
-    async function loadDemoFile(id) {
-      const zip = new JSZip();
-      zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Default Extension="bin" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.printerSettings"/>
-  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
-  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
-</Types>`);
-      zip.file("_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
-</Relationships>`);
-      zip.file("xl/workbook.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets><sheet name="RFI_Tracker" sheetId="1" r:id="rId1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/></sheets></workbook>`);
-      zip.file("xl/printerSettings/printerSettings1.bin", "SYNTHETIC_LOCAL_PRINTER_DEVMODE_PATH_\\SCT-FS01\Accounting_HP_LaserJet");
-
-      if (id === 1) {
-        zip.file("docProps/core.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:creator>External Deal Advisor (Sample)</dc:creator>
-  <cp:lastModifiedBy>Internal Reviewer (Sample)</cp:lastModifiedBy>
-  <dcterms:created xsi:type="dcterms:W3CDTF">2026-10-18T14:22:10Z</dcterms:created>
-  <dcterms:modified xsi:type="dcterms:W3CDTF">2026-10-30T09:15:44Z</dcterms:modified>
-</cp:coreProperties>`);
-        zip.file("docProps/app.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>Sample Advisory Corp</Company><Manager>Sample Deal Lead</Manager></Properties>`);
-        zip.file("xl/worksheets/sheet1.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Sample Due Diligence RFI Tracker — Ready for Scrubbing</t></is></c></row></sheetData></worksheet>`);
-        const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        const file = new File([blob], "1_Sample_RFI_Tracker_Test.xlsx", { type: blob.type, lastModified: Date.now() });
-        handleFiles([file]);
-      } else {
-        zip.file("docProps/core.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">
-  <dc:creator>Andrew Ruffner</dc:creator>
-  <cp:lastModifiedBy>Jason Marti</cp:lastModifiedBy>
-</cp:coreProperties>`);
-        zip.file("docProps/app.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>Cotton Creek Capital</Company></Properties>`);
-        zip.file("xl/worksheets/sheet1.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>CONFIDENTIAL: Cotton Creek Capital LBO Valuation &amp; Lubrizol Project Bertha Comparison</t></is></c></row></sheetData></worksheet>`);
-        const blob = await zip.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        const file = new File([blob], "2_Contaminated_Cross_Deal_Test.xlsx", { type: blob.type, lastModified: Date.now() });
-        handleFiles([file]);
-      }
-    }
 
 
     // Forbidden terms that MUST NEVER appear in any file going to Lubrizol / DFIN Venue
